@@ -1,0 +1,11 @@
+{
+  "name": "elm-github",
+  "scripts": {
+    "dev": "webpack --watch"
+  },
+  "devDependencies": {
+    "elm-webpack-loader": "^4.4.0",
+    "file-loader": "^1.1.6",
+    "webpack": "^3.11.0"
+  }
+}
