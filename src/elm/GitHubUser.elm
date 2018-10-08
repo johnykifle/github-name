@@ -8,95 +8,74 @@ import Http
 import Json.Decode as Decode
 
 -- Model
-
 type alias FormModel =
     { username : String
     , errors : List String
     }
 
 type alias GitHubModel =
-    { name : String }
+    { name : String
+    , login : String
+    }
 
 type alias Model =
     { form : FormModel
     , gitHubData : GitHubModel
     }
 
-init : () -> (Model, Cmd Msg)
-init _ = 
+init : flags -> (Model, Cmd Msg)
+init _ =
     (model, Cmd.none)
 
-initialFormUsername : String
-initialFormUsername =
+initialFormUserName : String
+initialFormUserName =
     ""
 
 initialForm : FormModel
 initialForm =
-    { username = initialFormUsername, errors = [] }
-
+    { username = initialFormUserName, errors = [] 
+    }
 
 
 model : Model
 model =
-    { form = 
-        { initialForm | errors = validateForm initialForm initialFormUsername } 
-    , gitHubData =
-        { name = initialFormUsername
+    { form =
+        {initialForm | errors = validateForm initialForm initialFormUserName}
+    , gitHubData = 
+        { name = initialFormUserName
+        , login = initialFormUserName
         }
     }
 
-    
--- MESSAGE
-type Msg
+-- Message
+type Msg 
     = RequestGitHubData
     | ProcessGitHubHttpRequest (Result Http.Error Model)
     | InputUserName String
-    
--- UPDATE
+
+-- Update
 
 update : Msg -> Model -> (Model, Cmd Msg)
-update msg newModel =
-    case msg of 
+update msg theModel =
+    case msg of
         RequestGitHubData ->
-            (newModel, requestGitHubData newModel.form)
-        
+            (theModel, requestGitHubData theModel.form)
         ProcessGitHubHttpRequest (Ok responseModel) ->
-            (responseModel, Cmd.none)
-        
+            ( responseModel, Cmd.none)
         ProcessGitHubHttpRequest (Err _) ->
-            (newModel, Cmd.none)
-        
+            (model, Cmd.none)
         InputUserName username ->
-            ( { newModel | form = { username = username, errors = validateForm newModel.form username }}, Cmd.none )
-
-validateForm : FormModel -> String -> List String
-validateForm formModel newUserName =
-    let
-        errorMessage =
-            "Username can not be blank"
-        
-        blankUserName =
-            newUserName == ""
-        
-        errorMessageExists =
-            List.member errorMessage formModel.errors
-
-    in
-    
-        if blankUserName && errorMessageExists == False then
-            formModel.errors ++ [ errorMessage ]
-        else if blankUserName && errorMessageExists then
-            formModel.errors
-        else
-            []
+            ( { theModel |  form = { username = username, errors = validateForm theModel.form username} }, Cmd.none)
 
 requestGitHubData : FormModel -> Cmd Msg
 requestGitHubData formModel =
-    Http.send ProcessGitHubHttpRequest (Http.get ("https://api.github.com/users/" ++ formModel.username) (decodeGitHubData formModel))
+    Http.send ProcessGitHubHttpRequest (Http.get ("https://api.github.com/users/" ++ formModel.username)  (decodeGitHubData formModel))
 
 decodeGitHubData : FormModel -> Decode.Decoder Model
 decodeGitHubData formModel =
-    Decode.map2 Model (formModelDecoder formModel) gitHubModelDecoder
+    Decode.map2 Model 
+        (formModelDecoder formModel)
+        gitHubModelDecoder
 
 formModelDecoder : FormModel -> Decode.Decoder FormModel
 formModelDecoder formModel =
@@ -104,47 +83,69 @@ formModelDecoder formModel =
 
 gitHubModelDecoder : Decode.Decoder GitHubModel
 gitHubModelDecoder =
-    Decode.map GitHubModel (Decode.field "name" Decode.string)
-
+    Decode.map2 GitHubModel 
+        (Decode.field "name" Decode.string)
+        (Decode.field "login" Decode.string)
 
 -- Subscriptions
 
 subscriptions : Model -> Sub Msg
-subscriptions subModel =
+subscriptions submodel =
     Sub.none
 
--- View
-
-view : Model -> Html Msg
-view existingModel =
-    if existingModel.gitHubData.name == "" then
-        div [] [ formView existingModel.form, formValidationView existingModel.form ]
+view: Model -> Html Msg
+view myModel =
+    if myModel.gitHubData.name == "" then
+        div [] [formView myModel.form, formValidationView myModel.form]
     else
-        dataView existingModel.gitHubData
+        dataView myModel.gitHubData
+
+formView : FormModel -> Html Msg
+formView formModel =
+    div []
+        [ input [type_ "text" , placeholder "github username", onInput InputUserName] []
+        , gitHubButtonView formModel
+        ]
 
 formValidationView : FormModel -> Html Msg
 formValidationView formModel =
-    div [] [ text ( String.join "" formModel.errors ) ]
+    div [] [ text (String.join "" formModel.errors)]
 
-formView: FormModel -> Html Msg
-formView formModel =
-    div []
-        [ input [ type_ "text", placeholder "Username", onInput InputUserName ] []
-        , githubButtonView formModel
+dataView : GitHubModel -> Html Msg
+dataView gitHubData =
+    div [] 
+        [ div [] [ text ("user name is " ++ gitHubData.name ) ]
+        , div [] [ text ("user login is " ++ gitHubData.login ) ]
         ]
-
-githubButtonView : FormModel -> Html Msg
-githubButtonView formModel =
-    if List.isEmpty formModel.errors then
-        button [ onClick RequestGitHubData ]
-            [ text "Gather data" ]
+gitHubButtonView : FormModel -> Html Msg
+gitHubButtonView fm =
+    if List.isEmpty fm.errors then
+        button [ onClick RequestGitHubData] [ text "Gather data"]
     else
         text ""
 
-dataView : GitHubModel -> Html Msg
-dataView exModel =
-    div []
-        [  text ("Username is " ++ exModel.name )]
+
+validateForm : FormModel -> String -> List String
+validateForm formModel newUsername =
+    let
+        errorMessage =
+            "Username cannot be blank"
+        
+        blankUserName =
+            newUsername == ""
+        
+        errorMessageExists =
+            List.member errorMessage formModel.errors
+    in
+
+    if blankUserName && errorMessageExists == False then
+        formModel.errors ++ [ errorMessage ]
+    else if blankUserName && errorMessageExists then
+        formModel.errors
+    else
+        []
+
+    
 
 main : Program () Model Msg
 main = 
